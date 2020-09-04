@@ -1,0 +1,88 @@
+# Loading the data and library caret
+
+```{r}
+
+library(caret)
+data= read.csv('pml-training.csv', stringsAsFactors= F)
+str(data)
+
+# Removing the first 7 columns as they are unnecessary
+
+v= c(-1,-2, -3, -4, -5, -6, -7)
+data= data[, v]
+
+# Changing the variable type to numeric and replacing NAs with 0
+v1= 2:152
+data[,v1]= sapply(data[,v1], as.numeric)
+data = replace(data, is.na(data),0)
+
+```
+
+# Creating partition
+
+```{r}
+intrain= createDataPartition(y= data$classe, p=.7, list=F)
+training= data[intrain,]
+testing= data[-intrain,]
+
+```
+# Parallel processing
+
+```{r}
+
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) 
+registerDoParallel(cluster)
+
+```
+
+# Fitting the random forest model
+
+The classe varaible is to be predicted and it depends on all the remaining variables.
+Random forest is used with 5-fold cross validation. Cross validation increases the
+accuracy of the model. 
+
+```{r}
+
+fitControl = trainControl(method = "cv", number = 5, allowParallel = TRUE)
+mod= train(classe~., method= 'rf', data=training, trControl= fitControl)
+
+stopCluster(cluster)
+registerDoSEQ()
+
+# Viewing the results 
+mod
+mod$resample
+confusionMatrix.train(mod)
+
+```
+Greater than 99% accuracy is attained which is satisfactory.
+
+# Checking accuracy on the testing data
+
+```{r}
+
+p1= predict(mod, testing)
+testing$classe = as.factor(testing$classe)
+confusionMatrix(p1, testing$classe)
+
+```
+The accuracy on the testing data is also greater than 99 percent.
+
+# Predicting on the new data
+
+```{r}
+
+# Applying same processing steps to the new data
+
+valid= read.csv('pml-testing.csv', stringsAsFactors= F)
+valid= valid[, v]
+valid[,v1]= sapply(valid[,v1], as.numeric)
+valid = replace(valid, is.na(valid),0)
+
+# Results
+p2= predict(mod, valid)
+p2
+
+```
